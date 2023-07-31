@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel;
+using System.Text;
 
 namespace TokenMen;
 
@@ -43,9 +44,9 @@ internal class WinAPI
     internal static extern IntPtr GetCurrentProcess();
 
     [DllImport("advapi32.dll", SetLastError = true)]
-    internal static extern bool CreateProcessAsUserW(IntPtr hToken, string lpApplicationName, string lpCommandLine, IntPtr lpProcessAttributes,
+    internal static extern bool CreateProcessAsUserA(IntPtr hToken, string lpApplicationName, string lpCommandLine, IntPtr lpProcessAttributes,
         IntPtr lpThreadAttributes, bool bInheritHandles, uint dwCreationFlags, IntPtr lpEnvironment,
-        IntPtr lpCurrentDirectory, [In] ref STARTUPINFO lpStartupInfo, out PROCESS_INFORMATION lpProcessInformation);
+        string lpCurrentDirectory, [In, Optional] ref STARTUPINFO lpStartupInfo, out PROCESS_INFORMATION lpProcessInformation);
 
     [DllImport("advapi32.dll", SetLastError = true)]
     internal static extern bool ImpersonateLoggedOnUser(IntPtr hToken);
@@ -64,6 +65,9 @@ internal class WinAPI
 
     [DllImport("netapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     internal static extern NET_API_STATUS NetGroupAddUser(string serverName, string groupName, string userName);
+
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    internal static extern uint GetSystemDirectoryW([Out] StringBuilder lpBuffer, uint uSize);
 
     [DllImport("advapi32.dll", SetLastError = true)]
     internal static extern uint GetSecurityInfo(IntPtr handle, SE_OBJECT_TYPE ObjectType, SECURITY_INFORMATION SecurityInfo,
