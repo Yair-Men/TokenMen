@@ -36,6 +36,7 @@ internal static class Utils
         }
 
         CloseHandle(hToken);
+        Console.WriteLine("[+] Privileges adjusted");
         return true;
     }
 }

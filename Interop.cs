@@ -70,6 +70,17 @@ internal class WinAPI
     internal static extern uint GetSystemDirectoryW([Out] StringBuilder lpBuffer, uint uSize);
 
     [DllImport("advapi32.dll", SetLastError = true)]
+    internal static extern bool SetTokenInformation(IntPtr TokenHandle,TOKEN_INFORMATION_CLASS TokenInformationClass, 
+        ref uint TokenInformation, uint TokenInformationLength);
+    
+    [DllImport("advapi32.dll", SetLastError = true)]
+    internal static extern bool GetTokenInformation(IntPtr TokenHandle,TOKEN_INFORMATION_CLASS TokenInformationClass,
+        out uint TokenInformation,  uint TokenInformationLength, out uint ReturnLength);
+
+    [DllImport("Userenv.dll", SetLastError = true)]
+    internal static extern bool CreateEnvironmentBlock( [Out] IntPtr lpEnvironment, [In, Optional] IntPtr hToken, [In] bool bInherit);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
     internal static extern uint GetSecurityInfo(IntPtr handle, SE_OBJECT_TYPE ObjectType, SECURITY_INFORMATION SecurityInfo,
         out IntPtr pSidOwner, out IntPtr pSidGroup, out IntPtr pDacl, out IntPtr pSacl, out IntPtr pSecurityDescriptor);
 
@@ -101,6 +112,59 @@ internal class WinAPI
 
 internal class WinEnums
 {
+    internal enum TOKEN_INFORMATION_CLASS
+    {
+        TokenUser = 1,
+        TokenGroups,
+        TokenPrivileges,
+        TokenOwner,
+        TokenPrimaryGroup,
+        TokenDefaultDacl,
+        TokenSource,
+        TokenType,
+        TokenImpersonationLevel,
+        TokenStatistics,
+        TokenRestrictedSids,
+        TokenSessionId,
+        TokenGroupsAndPrivileges,
+        TokenSessionReference,
+        TokenSandBoxInert,
+        TokenAuditPolicy,
+        TokenOrigin,
+        TokenElevationType,
+        TokenLinkedToken,
+        TokenElevation,
+        TokenHasRestrictions,
+        TokenAccessInformation,
+        TokenVirtualizationAllowed,
+        TokenVirtualizationEnabled,
+        TokenIntegrityLevel,
+        TokenUIAccess,
+        TokenMandatoryPolicy,
+        TokenLogonSid,
+        TokenIsAppContainer,
+        TokenCapabilities,
+        TokenAppContainerSid,
+        TokenAppContainerNumber,
+        TokenUserClaimAttributes,
+        TokenDeviceClaimAttributes,
+        TokenRestrictedUserClaimAttributes,
+        TokenRestrictedDeviceClaimAttributes,
+        TokenDeviceGroups,
+        TokenRestrictedDeviceGroups,
+        TokenSecurityAttributes,
+        TokenIsRestricted,
+        TokenProcessTrustLevel,
+        TokenPrivateNameSpace,
+        TokenSingletonAttributes,
+        TokenBnoIsolation,
+        TokenChildProcessFlags,
+        TokenIsLessPrivilegedAppContainer,
+        TokenIsSandboxed,
+        TokenIsAppSilo,
+        MaxTokenInfoClass
+    }
+
     public enum WELL_KNOWN_SID_TYPE
     {
         WinNullSid = 0,
