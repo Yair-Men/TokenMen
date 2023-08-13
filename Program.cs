@@ -1,15 +1,20 @@
 ﻿using Args;
+using System.Diagnostics;
 
 namespace TokenMen;
 
 public class Program
 {
+    private static readonly string AppName = AppDomain.CurrentDomain.FriendlyName;
+
+
     public static void Main(string[] args)
     {
 
+        Acl.DisplayAcls();
+        return;
 
-        string AppName = AppDomain.CurrentDomain.FriendlyName;
-
+        // TODO: Create Help to spit all args
         var ParsedArgs = ArgParse.Parse(args);
         if (!ParsedArgs.ParsedOk || args.Length == 0)
         {
@@ -64,15 +69,21 @@ public class Program
         {
             Console.WriteLine("[-] Invalid PID");
             return;
-        };
+        }
 
         // If we got session ID try uint it
-        if (bSessId)
+        if (bInteractive && bSessId) // Interactive and SessionID supplied by user
         {
             uint.TryParse(_sessId, out sessId);
         }
-
-        Console.WriteLine($"[!] Using token from PID: {targetPID} to launch: {executableToLaunch}");
+        else if (bInteractive && !bSessId) // Interactive supllied but NOT SessionID
+        {
+            ProcessIdToSessionId((uint)Process.GetCurrentProcess().Id, out sessId);
+        }
+        Console.WriteLine("[!] Using token from PID: {0} to launch: {1} {2}",
+                       targetPID,
+                       executableToLaunch,
+                       bSessId ? $"with Session ID: {sessId}" : "");
 
         string[] privileges = { SE_DEBUG_NAME, SE_IMPERSONATE_NAME };
         if (!Utils.PrivilegeEnabler(privileges))
@@ -102,13 +113,14 @@ public class Program
         tokenAccessRights = TokenAccessRights.TOKEN_ALL_ACCESS;
         bool dup = DuplicateTokenEx(hToken, tokenAccessRights, IntPtr.Zero,
             SECURITY_IMPERSONATION_LEVEL.SecurityDelegation, TOKEN_TYPE.TokenPrimary, out IntPtr hDupToken);
-        if (!dup)
+        if (!dup || hDupToken == IntPtr.Zero)
         {
             Console.WriteLine("[-] Failed to duplicate token. (Error: {0})", GetLastErrorString());
             return;
         }
         Console.WriteLine("[+] Token duplicated Successfully");
 
+    
         // TODO: restore ACL
         if (bChangeACL)
         {

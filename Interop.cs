@@ -1,4 +1,7 @@
-﻿using System.ComponentModel;
+﻿using System.Collections.Generic;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace TokenMen;
@@ -75,7 +78,10 @@ internal class WinAPI
     
     [DllImport("advapi32.dll", SetLastError = true)]
     internal static extern bool GetTokenInformation(IntPtr TokenHandle,TOKEN_INFORMATION_CLASS TokenInformationClass,
-        out uint TokenInformation,  uint TokenInformationLength, out uint ReturnLength);
+       out IntPtr TokenInformation,  uint TokenInformationLength, out uint ReturnLength);
+
+    [DllImport("Kernel32.dll", SetLastError = true)]
+    internal static extern bool ProcessIdToSessionId(uint dwProcessId, out uint pSessionId);
 
     [DllImport("Userenv.dll", SetLastError = true)]
     internal static extern bool CreateEnvironmentBlock( [Out] IntPtr lpEnvironment, [In, Optional] IntPtr hToken, [In] bool bInherit);
@@ -87,6 +93,22 @@ internal class WinAPI
     [DllImport("advapi32.dll", SetLastError = true)]
     internal static extern uint SetSecurityInfo(IntPtr handle, SE_OBJECT_TYPE ObjectType, SECURITY_INFORMATION SecurityInfo,
         IntPtr pSidOwner, IntPtr pSidGroup, IntPtr pDacl, IntPtr pSacl);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    internal static extern bool LookupAccountSidA([In, Optional] string lpSystemName, IntPtr Sid, [Out, Optional] StringBuilder Name, [Optional] ref uint cchName,
+        [Out, Optional] StringBuilder ReferencedDomainName, [In, Out] ref uint cchReferencedDomainName, out SID_NAME_USE peUse);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    internal static extern bool ConvertSecurityDescriptorToStringSecurityDescriptorA(IntPtr SecurityDescriptor,uint RequestedStringSDRevision,
+        SECURITY_INFORMATION SecurityInformation, [Out] out string StringSecurityDescriptor, [Out] out uint StringSecurityDescriptorLen);
+    
+    [DllImport("advapi32.dll", SetLastError = true)]
+    internal static extern uint LookupSecurityDescriptorPartsA([Out, Optional] out IntPtr ppOwner, [Out, Optional] out IntPtr ppGroup,
+        [Out, Optional] out uint pcCountOfAccessEntries, [Out, Optional] out IntPtr ppListOfAccessEntries,
+        [Out, Optional] out uint pcCountOfAuditEntries, [Out, Optional] out IntPtr ppListOfAuditEntries, [In] IntPtr pSD);
+
+    [DllImport("advapi32.dll", CharSet = CharSet.Ansi ,SetLastError = true)]
+    internal static extern string GetTrusteeNameA(IntPtr PTRUSTEE_A);
 
     [DllImport("advapi32.dll", SetLastError = true)]
     internal static extern bool CreateWellKnownSid(WELL_KNOWN_SID_TYPE WellKnownSidType, IntPtr DomainSid, IntPtr pSid, ref uint cbSid);
@@ -112,6 +134,21 @@ internal class WinAPI
 
 internal class WinEnums
 {
+    internal enum SID_NAME_USE
+    {
+        SidTypeUser = 1,
+        SidTypeGroup,
+        SidTypeDomain,
+        SidTypeAlias,
+        SidTypeWellKnownGroup,
+        SidTypeDeletedAccount,
+        SidTypeInvalid,
+        SidTypeUnknown,
+        SidTypeComputer,
+        SidTypeLabel,
+        SidTypeLogonSession
+    };
+
     internal enum TOKEN_INFORMATION_CLASS
     {
         TokenUser = 1,
@@ -486,21 +523,82 @@ internal class WinStrcuts
         public byte Sbz2;
     }
 
+    public enum TRUSTEE_FORM : uint
+    {
+        TRUSTEE_IS_SID,
+        TRUSTEE_IS_NAME,
+        TRUSTEE_BAD_FORM,
+        TRUSTEE_IS_OBJECTS_AND_SID,
+        TRUSTEE_IS_OBJECTS_AND_NAME
+    };
+
+    public enum TRUSTEE_TYPE : uint
+    {
+        TRUSTEE_IS_UNKNOWN,
+        TRUSTEE_IS_USER,
+        TRUSTEE_IS_GROUP,
+        TRUSTEE_IS_DOMAIN,
+        TRUSTEE_IS_ALIAS,
+        TRUSTEE_IS_WELL_KNOWN_GROUP,
+        TRUSTEE_IS_DELETED,
+        TRUSTEE_IS_INVALID,
+        TRUSTEE_IS_COMPUTER
+    };
+
+    public enum MULTIPLE_TRUSTEE_OPERATION : uint
+    {
+        NO_MULTIPLE_TRUSTEE,
+        TRUSTEE_IS_IMPERSONATE
+    };
+
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
     public struct TRUSTEE
     {
         public IntPtr pMultipleTrustee;
-        public uint MultipleTrusteeOperation;
-        public uint TrusteeForm;
-        public uint TrusteeType;
+        public MULTIPLE_TRUSTEE_OPERATION MultipleTrusteeOperation;
+        public TRUSTEE_FORM TrusteeForm;
+        public TRUSTEE_TYPE TrusteeType;
         public IntPtr ptstrName;
     }
 
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 0)]
+    public struct TRUSTEE_A
+    {
+        public IntPtr pMultipleTrustee;
+        public MULTIPLE_TRUSTEE_OPERATION MultipleTrusteeOperation;
+        public TRUSTEE_FORM TrusteeForm;
+        public TRUSTEE_TYPE TrusteeType;
+        private IntPtr ptstrName;
+        public string strName => Marshal.PtrToStringAnsi(ptstrName);
+    }
+
+    public enum ACCESS_MODE : uint
+    {
+        NOT_USED_ACCESS,
+        GRANT_ACCESS,
+        SET_ACCESS,
+        DENY_ACCESS,
+        REVOKE_ACCESS,
+        SET_AUDIT_SUCCESS,
+        SET_AUDIT_FAILURE
+    };
+
+    [StructLayout (LayoutKind.Sequential, Pack = 0)]
     public struct EXPLICIT_ACCESS
     {
         public uint grfAccessPermissions;
-        public uint grfAccessMode;
+        public ACCESS_MODE grfAccessMode;
         public uint grfInheritance;
         public TRUSTEE Trustee;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 0)]
+    public struct EXPLICIT_ACCESS_A
+    {
+        public uint grfAccessPermissions;
+        public ACCESS_MODE grfAccessMode;
+        public uint grfInheritance;
+        public TRUSTEE_A Trustee;
     }
 
     [StructLayout(LayoutKind.Sequential)]
