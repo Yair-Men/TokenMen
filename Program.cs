@@ -11,8 +11,8 @@ public class Program
     public static void Main(string[] args)
     {
 
-        Acl.DisplayAcls();
-        return;
+        //Acl.DisplayAcls();
+        //return;
 
         // TODO: Create Help to spit all args
         var ParsedArgs = ArgParse.Parse(args);

@@ -78,7 +78,11 @@ internal class WinAPI
     
     [DllImport("advapi32.dll", SetLastError = true)]
     internal static extern bool GetTokenInformation(IntPtr TokenHandle,TOKEN_INFORMATION_CLASS TokenInformationClass,
-       out IntPtr TokenInformation,  uint TokenInformationLength, out uint ReturnLength);
+       IntPtr TokenInformation,  uint TokenInformationLength, out uint ReturnLength);
+    
+    [DllImport("advapi32.dll", SetLastError = true)]
+    internal static extern bool GetTokenInformation(IntPtr TokenHandle, TOKEN_INFORMATION_CLASS TokenInformationClass,
+   out IntPtr TokenInformation, uint TokenInformationLength, out uint ReturnLength);
 
     [DllImport("Kernel32.dll", SetLastError = true)]
     internal static extern bool ProcessIdToSessionId(uint dwProcessId, out uint pSessionId);
@@ -126,7 +130,7 @@ internal class WinAPI
     internal static extern IntPtr LocalFree(IntPtr hMem);
 
     [DllImport("advapi32", CharSet = CharSet.Auto, SetLastError = true)]
-    internal static extern bool ConvertSidToStringSid(IntPtr pSid, out IntPtr strSid);
+    internal static extern bool ConvertSidToStringSid(IntPtr pSid, out IntPtr pStrSid);
 
     [DllImport("advapi32.dll", SetLastError = true)]
     internal static extern bool ConvertStringSidToSid(string StringSid, [Out] out IntPtr ptrSid);
@@ -484,6 +488,18 @@ internal class WinEnums
 
 internal class WinStrcuts
 {
+    [StructLayout(LayoutKind.Sequential)]
+    public struct SID_AND_ATTRIBUTES
+    {
+        public IntPtr pSID;
+        public uint Attributes;
+    }
+
+    public struct TOKEN_USER
+    {
+        public SID_AND_ATTRIBUTES User;
+    }
+
     public struct SID_IDENTIFIER_AUTHORITY
     {
         [MarshalAs(UnmanagedType.ByValArray, SizeConst = 6)]
@@ -551,7 +567,7 @@ internal class WinStrcuts
         TRUSTEE_IS_IMPERSONATE
     };
 
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    [StructLayout(LayoutKind.Sequential, Pack = 0)]
     public struct TRUSTEE
     {
         public IntPtr pMultipleTrustee;

@@ -1,4 +1,5 @@
-﻿
+﻿using System.Diagnostics;
+using System.Security.Principal;
 using System.Text;
 
 namespace TokenMen;
@@ -18,9 +19,6 @@ internal class Acl
 
     private static readonly SECURITY_INFORMATION secInfo = SECURITY_INFORMATION.OWNER_SECURITY_INFORMATION | SECURITY_INFORMATION.GROUP_SECURITY_INFORMATION |
             SECURITY_INFORMATION.SACL_SECURITY_INFORMATION | SECURITY_INFORMATION.DACL_SECURITY_INFORMATION;
-
-    
-
     internal static bool DisplayAcls() 
     {
         // Enable SeSecurityPrivilege
@@ -79,6 +77,8 @@ internal class Acl
             eaDaclList[i++] = Marshal.PtrToStructure<EXPLICIT_ACCESS_A>(ppListOfDaclEa);
             ppListOfDaclEa += jump;
         }
+
+  
 
         Console.WriteLine("Finished");
         #endregion
@@ -141,10 +141,7 @@ internal class Acl
         if (!Utils.PrivilegeEnabler(new string[] { SE_SECURITY_NAME }))
             return false;
 
-        
-
         IntPtr hWinsta = OpenWindowStation("WinSta0", false, WRITE_DAC | READ_CONTROL);
-
         if (hWinsta == IntPtr.Zero)
         {
             Console.WriteLine("[-] Failed to get handle to Windows Station. (Error: {0})", GetLastErrorString());
@@ -215,7 +212,7 @@ internal class Acl
         realsize = 10;
         // Getting the correct size and allocating memory
         CreateWellKnownSid(WELL_KNOWN_SID_TYPE.WinBuiltinAnyPackageSid, IntPtr.Zero, IntPtr.Zero, ref realsize);
-        pAppPackageSid = Marshal.AllocCoTaskMem((int)realsize);
+        pAppPackageSid = Marshal.AllocCoTaskMem(Convert.ToInt32(realsize));
 
         status = CreateWellKnownSid(WELL_KNOWN_SID_TYPE.WinBuiltinAnyPackageSid, IntPtr.Zero, pAppPackageSid, ref realsize);
         if (!status)
@@ -225,25 +222,71 @@ internal class Acl
             return false;
         }
 
+        /// TODO: Dynamic ACL works good, make it coresponds to /changeacl:dynamic
+        /// And default to everyone
+        /// Change grfAccessMode to ACCESS_MODE.REVOKE_ACCESS to revert changes (restore acls)
+        /// Change TrusteeType (i.e. TRUSTEE_TYPE.TRUSTEE_IS_DOMAIN) dynamically
+        #region TESTING
+        if (!OpenProcessToken(OpenProcess(PROCESS_ACCESS.PROCESS_QUERY_LIMITED_INFORMATION, false, 5192), TokenAccessRights.TOKEN_QUERY, out IntPtr hToken))
+        {
+            Console.WriteLine("[-] Failed to get own token. (Error: {0})", GetLastErrorString());
+            return false;
+        }
+        Console.WriteLine("[+] Got token handle");
+
+        int infoLength = Marshal.SizeOf<TOKEN_USER>();
+        IntPtr tokenInfo = IntPtr.Zero;
+
+        if (!GetTokenInformation(hToken, TOKEN_INFORMATION_CLASS.TokenUser, IntPtr.Zero, 0, out uint retLen))
+        {
+            Console.WriteLine("[-] Failed to get token user. (Error: {0})", GetLastErrorString());
+            Console.WriteLine("[!] Given length: {0} | required length: {1}", infoLength, retLen);
+
+            tokenInfo = Marshal.AllocHGlobal((int)retLen);
+            if (!GetTokenInformation(hToken, TOKEN_INFORMATION_CLASS.TokenUser, tokenInfo, retLen, out retLen))
+            {
+                Console.WriteLine("[-] Failed again. (Error: {0})", GetLastErrorString());
+                return false;
+            }
+            else
+            {
+                Console.WriteLine();
+            }
+        }
+        Console.WriteLine("[+] Got token information");
+        //IntPtr pSid = Marshal.ReadIntPtr(tokenInfo);
+
+        TOKEN_USER data = Marshal.PtrToStructure<TOKEN_USER>(tokenInfo);
+        IntPtr pSid = data.User.pSID;
+
+        if (!ConvertSidToStringSid(pSid, out IntPtr strSid))
+        {
+            Console.WriteLine("[-] Failed to get token user. (Error: {0})", GetLastErrorString());
+            return false;
+        }
+        Console.WriteLine("[!] SID in token: {0}", Marshal.PtrToStringAuto(strSid));
+        #endregion TESTING
 
         // EnumDesktops|ReadAttributes|AccessClipboard|CreateDesktop|WriteAttributes|AccessGlobalAtoms|ExitWindows|Enumerate|ReadScreen|Delete|ReadControl|WriteDac|WriteOwner
-        uint accessPermissions = 983_935;
+        uint accessPermissionsWorkStation = 983_935;
+        
+        uint accessPermissionsDesktop = 983_551;
+        
 
         #region WorkStation DACL
         // START Trustee and Explicit Access for Workstation DACL
         var pTrusteeWorkStation = new TRUSTEE[2];
         var pListOfExplicitEntriesWorkStation = new EXPLICIT_ACCESS[2];
 
-        //IntPtr pEveryOneSid = Marshal.AllocHGlobal(1);
-        //Marshal.WriteInt32(pEveryOneSid, WellKnownSidType.WorldSid);
-
         pTrusteeWorkStation[0].pMultipleTrustee = IntPtr.Zero;
         pTrusteeWorkStation[0].MultipleTrusteeOperation = MULTIPLE_TRUSTEE_OPERATION.NO_MULTIPLE_TRUSTEE;
         pTrusteeWorkStation[0].TrusteeForm = TRUSTEE_FORM.TRUSTEE_IS_SID;
-        pTrusteeWorkStation[0].TrusteeType = TRUSTEE_TYPE.TRUSTEE_IS_UNKNOWN;
-        pTrusteeWorkStation[0].ptstrName = pEveryoneSid; // (LPWCH)EveryoneSid;
+        //pTrusteeWorkStation[0].TrusteeType = TRUSTEE_TYPE.TRUSTEE_IS_UNKNOWN;
+        //pTrusteeWorkStation[0].ptstrName = pEveryoneSid; // (LPWCH)EveryoneSid;
+        pTrusteeWorkStation[0].TrusteeType = TRUSTEE_TYPE.TRUSTEE_IS_DOMAIN;
+        pTrusteeWorkStation[0].ptstrName = data.User.pSID;
 
-        pListOfExplicitEntriesWorkStation[0].grfAccessPermissions = accessPermissions;
+        pListOfExplicitEntriesWorkStation[0].grfAccessPermissions = accessPermissionsWorkStation;
         pListOfExplicitEntriesWorkStation[0].grfAccessMode = ACCESS_MODE.GRANT_ACCESS;
         pListOfExplicitEntriesWorkStation[0].grfInheritance = 0;
         pListOfExplicitEntriesWorkStation[0].Trustee = pTrusteeWorkStation[0];
@@ -251,10 +294,12 @@ internal class Acl
         pTrusteeWorkStation[1].pMultipleTrustee = IntPtr.Zero;
         pTrusteeWorkStation[1].MultipleTrusteeOperation = MULTIPLE_TRUSTEE_OPERATION.NO_MULTIPLE_TRUSTEE;
         pTrusteeWorkStation[1].TrusteeForm = TRUSTEE_FORM.TRUSTEE_IS_SID;
-        pTrusteeWorkStation[1].TrusteeType = TRUSTEE_TYPE.TRUSTEE_IS_UNKNOWN;
-        pTrusteeWorkStation[1].ptstrName = pAppPackageSid;
+        //pTrusteeWorkStation[1].TrusteeType = TRUSTEE_TYPE.TRUSTEE_IS_UNKNOWN;
+        //pTrusteeWorkStation[1].ptstrName = pAppPackageSid;
+        pTrusteeWorkStation[1].TrusteeType = TRUSTEE_TYPE.TRUSTEE_IS_DOMAIN;
+        pTrusteeWorkStation[1].ptstrName = data.User.pSID;
 
-        pListOfExplicitEntriesWorkStation[1].grfAccessPermissions = accessPermissions;
+        pListOfExplicitEntriesWorkStation[1].grfAccessPermissions = accessPermissionsWorkStation;
         pListOfExplicitEntriesWorkStation[1].grfAccessMode = ACCESS_MODE.GRANT_ACCESS;
         pListOfExplicitEntriesWorkStation[1].grfInheritance = 0;
         pListOfExplicitEntriesWorkStation[1].Trustee = pTrusteeWorkStation[1];
@@ -269,10 +314,12 @@ internal class Acl
         pTrusteeDesktop[0].pMultipleTrustee = IntPtr.Zero;
         pTrusteeDesktop[0].MultipleTrusteeOperation = MULTIPLE_TRUSTEE_OPERATION.NO_MULTIPLE_TRUSTEE;
         pTrusteeDesktop[0].TrusteeForm = TRUSTEE_FORM.TRUSTEE_IS_SID;
-        pTrusteeDesktop[0].TrusteeType = TRUSTEE_TYPE.TRUSTEE_IS_UNKNOWN;
-        pTrusteeDesktop[0].ptstrName = pEveryoneSid; // (LPWCH)EveryoneSid;
+        //pTrusteeDesktop[0].TrusteeType = TRUSTEE_TYPE.TRUSTEE_IS_UNKNOWN;
+        //pTrusteeDesktop[0].ptstrName = pEveryoneSid; // (LPWCH)EveryoneSid;
+        pTrusteeDesktop[0].TrusteeType = TRUSTEE_TYPE.TRUSTEE_IS_DOMAIN;
+        pTrusteeDesktop[0].ptstrName = pSid;
 
-        pListOfExplicitEntriesDesktop[0].grfAccessPermissions = accessPermissions;
+        pListOfExplicitEntriesDesktop[0].grfAccessPermissions = accessPermissionsDesktop;
         pListOfExplicitEntriesDesktop[0].grfAccessMode = ACCESS_MODE.GRANT_ACCESS;
         pListOfExplicitEntriesDesktop[0].grfInheritance = 0;
         pListOfExplicitEntriesDesktop[0].Trustee = pTrusteeDesktop[0];
@@ -280,10 +327,12 @@ internal class Acl
         pTrusteeDesktop[1].pMultipleTrustee = IntPtr.Zero;
         pTrusteeDesktop[1].MultipleTrusteeOperation = MULTIPLE_TRUSTEE_OPERATION.NO_MULTIPLE_TRUSTEE;
         pTrusteeDesktop[1].TrusteeForm = TRUSTEE_FORM.TRUSTEE_IS_SID;
-        pTrusteeDesktop[1].TrusteeType = TRUSTEE_TYPE.TRUSTEE_IS_UNKNOWN;
-        pTrusteeDesktop[1].ptstrName = pAppPackageSid;
+        //pTrusteeDesktop[1].TrusteeType = TRUSTEE_TYPE.TRUSTEE_IS_UNKNOWN;
+        //pTrusteeDesktop[1].ptstrName = pAppPackageSid;
+        pTrusteeDesktop[1].TrusteeType = TRUSTEE_TYPE.TRUSTEE_IS_DOMAIN;
+        pTrusteeDesktop[1].ptstrName = pSid;
 
-        pListOfExplicitEntriesDesktop[1].grfAccessPermissions = accessPermissions;
+        pListOfExplicitEntriesDesktop[1].grfAccessPermissions = accessPermissionsDesktop;
         pListOfExplicitEntriesDesktop[1].grfAccessMode = ACCESS_MODE.GRANT_ACCESS;
         pListOfExplicitEntriesDesktop[1].grfInheritance = 0;
         pListOfExplicitEntriesDesktop[1].Trustee = pTrusteeDesktop[1];
@@ -295,10 +344,10 @@ internal class Acl
         switch (objName)
         {
             case ObjectType.WorkStation:
-                SetEntriesInAcl(2, pListOfExplicitEntriesWorkStation, ppDacl, out NewDacl);
+                retval = SetEntriesInAcl(2, pListOfExplicitEntriesWorkStation, ppDacl, out NewDacl);
                 break;
             case ObjectType.Desktop:
-                SetEntriesInAcl(2, pListOfExplicitEntriesDesktop, ppDacl, out NewDacl);
+                retval = SetEntriesInAcl(2, pListOfExplicitEntriesDesktop, ppDacl, out NewDacl);
                 break;
             default:
                 Console.WriteLine("[-] Unknown Object Type");
@@ -307,7 +356,8 @@ internal class Acl
 
         if (retval != 0)
         {
-            Console.WriteLine("[-] Failed to call SetEntriesInAcl on {0}. Error Code: {0} ({1})", objName, GetLastError(), GetLastErrorString());
+            Console.WriteLine("[-] Failed to call SetEntriesInAcl on {0}. Error Code: {1} ({2})", objName, GetLastError(), GetLastErrorString());
+            return false;
         }
         Console.WriteLine("[+] SetEntriesInAcl for {0} Succeeded.", objName);
 
@@ -315,8 +365,8 @@ internal class Acl
         if (NewDacl == IntPtr.Zero)
         {
             Console.WriteLine("[-] NewDacl Handle is zero. (Error: {0})", GetLastErrorString());
-            Marshal.FreeCoTaskMem(pEveryoneSid);
-            Marshal.FreeCoTaskMem(pAppPackageSid);
+            //Marshal.FreeCoTaskMem(pEveryoneSid);
+            //Marshal.FreeCoTaskMem(pAppPackageSid);
             return false;
         }
 
