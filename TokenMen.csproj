@@ -57,9 +57,12 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Acl.cs" />
+    <Compile Include="Helpers\AclHelpers.cs" />
     <Compile Include="Args\ArgParse.cs" />
     <Compile Include="Args\ArgumentParserResult.cs" />
     <Compile Include="GlobalUsings.cs" />
+    <Compile Include="Helpers\SidHelpers.cs" />
+    <Compile Include="Helpers\TrusteeAndEA.cs" />
     <Compile Include="Interop.cs" />
     <Compile Include="Launcher.cs" />
     <Compile Include="Program.cs" />
@@ -69,5 +72,6 @@
   <ItemGroup>
     <None Include="App.config" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

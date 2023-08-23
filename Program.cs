@@ -46,26 +46,30 @@ public class Program
         //  ACL-Restore      -   Restore changed DACLs based on JSON file or user input
         //  ACL-Auto ??      -   Changed DACLs based on impersonated user rather than using Everyone
         // And parse arguments more nicely plzzz
-        string _sessId = String.Empty;
+        string _sessId;
         uint sessId = UInt32.MaxValue;
-        string executableToLaunch = String.Empty;
-        string _PID = String.Empty;
+        string command;
+        string sPID;
+        string changeACL;
 
         bool bInteractive = ParsedArgs.Arguments.ContainsKey("/interactive") || ParsedArgs.Arguments.ContainsKey("/i");
-        bool bSessId = ParsedArgs.Arguments.TryGetValue("/sessionId", out _sessId) || ParsedArgs.Arguments.TryGetValue("/s", out _sessId);
-        bool bCommand = ParsedArgs.Arguments.TryGetValue("/command", out executableToLaunch) || ParsedArgs.Arguments.TryGetValue("/c", out executableToLaunch);
-        bool bPid = ParsedArgs.Arguments.TryGetValue("/pid", out _PID) || ParsedArgs.Arguments.TryGetValue("/p", out _PID);
-        bool bChangeACL = ParsedArgs.Arguments.TryGetValue("/changeACL", out string DACL);
-        //bool bRestoreACL = ParsedArgs.Arguments.TryGetValue("/restore", out string DACL);
+        bool bSessId = ParsedArgs.Arguments.TryGetValue("/sessionId", out _sessId) || ParsedArgs.Arguments.TryGetValue("/si", out _sessId);
+        bool bCommand = ParsedArgs.Arguments.TryGetValue("/command", out command) || ParsedArgs.Arguments.TryGetValue("/c", out command);
+        bool bPid = ParsedArgs.Arguments.TryGetValue("/pid", out sPID) || ParsedArgs.Arguments.TryGetValue("/p", out sPID);
+        bool bChangeACL = ParsedArgs.Arguments.TryGetValue("/changeACL", out changeACL) || ParsedArgs.Arguments.TryGetValue("/ca", out changeACL);
+       
+        // Allow user to change ACLs based on supplied SID/username
+        bool bTrusteeName = ParsedArgs.Arguments.TryGetValue("/user", out string trusteeName);
+        bool bTrusteeSid = ParsedArgs.Arguments.TryGetValue("/sid", out string trusteeSidString);
 
-
-        if (!bPid || !bCommand || executableToLaunch == String.Empty)
+        if (!bPid || !bCommand || command == String.Empty)
         {
-            Console.WriteLine("[!] Please specify PID and command");
+            Console.WriteLine("[!] Missing /pid or /command");
             return;
         }
+
         // Get PID of a user's process to grab the token from, and command to launch with that token
-        if (!uint.TryParse(_PID, out uint targetPID)) 
+        if (!uint.TryParse(sPID, out uint targetPID)) 
         {
             Console.WriteLine("[-] Invalid PID");
             return;
@@ -74,15 +78,14 @@ public class Program
         // If we got session ID try uint it
         if (bInteractive && bSessId) // Interactive and SessionID supplied by user
         {
-            uint.TryParse(_sessId, out sessId);
-        }
-        else if (bInteractive && !bSessId) // Interactive supllied but NOT SessionID
-        {
-            ProcessIdToSessionId((uint)Process.GetCurrentProcess().Id, out sessId);
+            if (bSessId)
+                uint.TryParse(_sessId, out sessId);
+            else
+                ProcessIdToSessionId((uint)Process.GetCurrentProcess().Id, out sessId);
         }
         Console.WriteLine("[!] Using token from PID: {0} to launch: {1} {2}",
                        targetPID,
-                       executableToLaunch,
+                       command,
                        bSessId ? $"with Session ID: {sessId}" : "");
 
         string[] privileges = { SE_DEBUG_NAME, SE_IMPERSONATE_NAME };
@@ -124,7 +127,40 @@ public class Program
         // TODO: restore ACL
         if (bChangeACL)
         {
-            if (!Acl.ChangeDesktopACL())
+            object objTrustee = null;
+            AclActions aclAction;
+            
+            if (changeACL.Length > 0)
+            {
+                if (!Enum.TryParse(changeACL, true, out aclAction))
+                {
+                    Console.WriteLine("[-] Invalid changeACL value");
+                    return;
+                }
+
+                if (aclAction == AclActions.Dynamic)
+                    objTrustee = hDupToken;
+            }
+            else
+            {
+                if (bTrusteeName)
+                {
+                    aclAction = AclActions.User;
+                    objTrustee = trusteeName;
+                }
+                else if (bTrusteeSid)
+                {
+                    aclAction = AclActions.Sid;
+                    objTrustee = trusteeSidString;
+                }
+                else
+                {
+                    Console.WriteLine("[-] Missing /sid or /user");
+                    return;
+                }
+            }
+
+            if (!Acl.Change(aclAction, objTrustee))
             {
                 Console.WriteLine("[-] Failed to change ACLs");
                 return;
@@ -132,7 +168,7 @@ public class Program
             Console.WriteLine("[+] ACLs changed");
         }
 
-        Launcher launcher = new(hDupToken, executableToLaunch, bInteractive, sessId);
+        Launcher launcher = new(hDupToken, command, bInteractive, sessId);
         if (launcher.Launch())
             Console.WriteLine("[+] Enjoy the shellzzz :) ");
     }
