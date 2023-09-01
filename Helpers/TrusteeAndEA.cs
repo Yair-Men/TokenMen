@@ -20,9 +20,7 @@ internal static class TrusteeAndEA
             pMultipleTrustee = IntPtr.Zero,
             MultipleTrusteeOperation = MULTIPLE_TRUSTEE_OPERATION.NO_MULTIPLE_TRUSTEE,
             TrusteeType = TRUSTEE_TYPE.TRUSTEE_IS_UNKNOWN,
-            // TRUSTEE_FORM.TRUSTEE_IS_NAME if ptstrName points to string username
-            // TRUSTEE_FORM.TRUSTEE_IS_SID if ptstrName points to sid
-            TrusteeForm = TRUSTEE_FORM.TRUSTEE_IS_NAME,
+            TrusteeForm = trusteeForm,
             ptstrName = ptstrName
         };
 

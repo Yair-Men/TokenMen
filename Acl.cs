@@ -1,5 +1,4 @@
 ﻿using TokenMen.Helpers;
-using static TokenMen.WinStrcuts;
 
 namespace TokenMen;
 
@@ -48,9 +47,11 @@ internal class Acl
         if (!Utils.PrivilegeEnabler(new string[] { SE_SECURITY_NAME }))
             return false;
 
-
-        var arrTrustee = new TRUSTEE[2];
-        var arrEa = new EXPLICIT_ACCESS[2];
+        // TODO: In all modes but AclActions.all need only 1 TRUSTEE and 1 EA
+        // Doesn't break functionality but try to figure out how to change arr size dynamically
+        var arrTrustee = new TRUSTEE[1];
+        var arrEa = new EXPLICIT_ACCESS[1];
+        
 
         IntPtr pTrusteeName = IntPtr.Zero;
         var trusteeForm = TRUSTEE_FORM.TRUSTEE_IS_SID;
@@ -72,13 +73,12 @@ internal class Acl
             case AclActions.Sid: 
                 if (!ConvertStringSidToSid((string)objTrustee, out pTrusteeName))
                 {
-                    Console.WriteLine("[-] Failed to convert given SID");
+                    Console.WriteLine("[-] Failed to convert string SID");
                     return false;
                 }
                 break;
 
-            /// If AclActions.User: objTrustee is string contains the username
-            /// e.g: string objTrustee = @"menty\omera"
+            /// If AclActions.User: objTrustee is string contains the username. e.g: @"menty\omera"
             case AclActions.User:
                 pTrusteeName = Marshal.StringToHGlobalAnsi((string)objTrustee);
                 if (pTrusteeName == IntPtr.Zero)
@@ -94,6 +94,11 @@ internal class Acl
                 pTrusteeName = SidHelpers.CreatePermissiveSid(WELL_KNOWN_SID_TYPE.WinWorldSid);
                 if (pTrusteeName == IntPtr.Zero)
                     return false;
+
+                // If AclActions.All: We need another EA and Trustee (for AppPackage)
+                Array.Resize<EXPLICIT_ACCESS>(ref arrEa, arrEa.Length + 1);
+                Array.Resize<TRUSTEE>(ref arrTrustee, arrTrustee.Length + 1);
+
                 break;
 
             default:
@@ -102,25 +107,20 @@ internal class Acl
         }
 
 
+        #region WorkStation ACL
 
-        // WorkStation TRUSTEE
         arrTrustee[0] = TrusteeAndEA.CreateTrustee(trusteeForm, pTrusteeName);
-        arrTrustee[1] = TrusteeAndEA.CreateTrustee(trusteeForm, pTrusteeName);
+        arrEa[0] = TrusteeAndEA.CreateEa(arrTrustee[0], ObjectTypePermission.WorkStation, accessMode);
 
-        /// If AclActions.All: 2nd Trustee is AppPackage
         if (aclAction == AclActions.All)
         {
             IntPtr pAppPackageSid = SidHelpers.CreatePermissiveSid(WELL_KNOWN_SID_TYPE.WinBuiltinAnyPackageSid);
             if (pAppPackageSid == IntPtr.Zero)
                 return false;
 
-            arrTrustee[1].ptstrName = pAppPackageSid;
+            arrTrustee[1] = TrusteeAndEA.CreateTrustee(trusteeForm, pAppPackageSid);
+            arrEa[1] = TrusteeAndEA.CreateEa(arrTrustee[1], ObjectTypePermission.WorkStation, accessMode);
         }
-
-        // WorkStation EXPLICIT_ACCESS
-        arrEa[0] = TrusteeAndEA.CreateEa(arrTrustee[0], ObjectTypePermission.WorkStation, accessMode);
-        arrEa[1] = TrusteeAndEA.CreateEa(arrTrustee[1], ObjectTypePermission.WorkStation, accessMode);
-
 
         IntPtr hWinsta = OpenWindowStation("WinSta0", false, WRITE_DAC | READ_CONTROL);
         if (hWinsta == IntPtr.Zero)
@@ -135,6 +135,17 @@ internal class Acl
             CloseHandle(hWinsta);
             return false;
         }
+        #endregion WorkStation ACL
+
+
+        #region Desktop ACL
+
+        // Only changes to grfAccessPermissions propety required to adjust for Desktop change ACL
+        arrEa[0].grfAccessPermissions = (uint)ObjectTypePermission.Desktop;
+        
+        // If AclActions.All, we have another TRUSTEE
+        if (aclAction == AclActions.All)
+            arrEa[1].grfAccessPermissions = (uint)ObjectTypePermission.Desktop;
 
         IntPtr hDesktop = OpenDesktopA("Default", 0, false, WRITE_DAC | DESKTOP_READOBJECTS | DESKTOP_WRITEOBJECTS);
         if (hDesktop == IntPtr.Zero)
@@ -144,21 +155,18 @@ internal class Acl
             return false;
         }
 
-        // Only changes to grfAccessPermissions propety required to adjust for Desktop change ACL
-        arrEa[0].grfAccessPermissions = (uint)ObjectTypePermission.Desktop;
-        arrEa[1].grfAccessPermissions = (uint)ObjectTypePermission.Desktop;
-
         if (!ChangeACL(hDesktop, ObjectTypeName.Desktop, arrEa))
         {
             Console.WriteLine("[-] Failed to set Dacl on Desktop. (Error: {0})", GetLastErrorString());
             CloseHandle(hDesktop);
             return false;
         }
+        #endregion Desktop ACL
 
+        // Cleaning
         CloseHandle(hWinsta);
         CloseHandle(hDesktop);
-        Marshal.FreeCoTaskMem(pTrusteeName);
-
+        
         return true;
     }
 
@@ -170,7 +178,6 @@ internal class Acl
     /// Change grfAccessMode to ACCESS_MODE.REVOKE_ACCESS to revert changes (restore acls)
     /// Change TrusteeType (i.e. TRUSTEE_TYPE.TRUSTEE_IS_DOMAIN) dynamically
     /// TODO: Dynamic ACL works good, make it coresponds to /changeacl:dynamic
-
 
     private static bool ChangeACL(IntPtr hObject, ObjectTypeName objName, EXPLICIT_ACCESS[] arrEa)
     {
@@ -184,7 +191,7 @@ internal class Acl
             return false;
         }
 
-        int retval = SetEntriesInAcl(2, arrEa, ppDacl, out IntPtr NewDacl);
+        int retval = SetEntriesInAcl(arrEa.Length, arrEa, ppDacl, out IntPtr NewDacl);
         if (retval != 0 || NewDacl == IntPtr.Zero)
         {
             Console.WriteLine("[-] Failed to call SetEntriesInAcl for {0}. (Error: {1})", objName, GetLastErrorString());
@@ -202,5 +209,4 @@ internal class Acl
         LocalFree(ppSecurityDescriptor);
         return true;
     }
-
 }

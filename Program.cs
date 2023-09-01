@@ -7,7 +7,6 @@ public class Program
 {
     private static readonly string AppName = AppDomain.CurrentDomain.FriendlyName;
 
-
     public static void Main(string[] args)
     {
 
