@@ -1,26 +1,83 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
 
 namespace Args;
 
-// ToDo:
-// 1. Implement Help method to print all args name (Long/Short), description, and if Required
-// 2. Add support for modules (Where the first positional argument is the module name)
-// 3. Add support/parsing for Properties of type Enum                                           - DONE
-// 4. Add logic for boolean properties (if exists as CLI arg without value, then true)          - DONE
 
 public class ArgParser
 {
     private IEnumerable<string> RawArgs { get; }
     public Dictionary<string, string> ParsedArgsDict { get; private set; } /// Leave public getter for old school access
     private Dictionary<string, ArgsAttribute> _argsAttributesDict { get; set; } = new();
+    public string ModuleName { get; } = null;
+    private static IEnumerable<ModuleAttribute> ModulesList { get; set; }
 
-    public ArgParser(string[] args)
+    private ArgParser(IEnumerable<string> args, string moduleName = null)
     {
         RawArgs = args;
+        ModuleName = moduleName;
+    }
+
+    /// <summary>
+    /// First checks. If we got arguments, if this is module based program then match the given module
+    /// </summary>
+    /// <param name="args">The ars received from user via the CLI</param>
+    /// <param name="withModule">If there are modules in the program execution flow</param>
+    /// <returns>A new instace of ArgParser to be use with the parse method to populate the arguments</returns>
+    public static ArgParser Init(string[] args, bool withModule = false)
+    {
+        ModulesList =
+            from a in AppDomain.CurrentDomain.GetAssemblies()
+            from t in a.GetTypes()
+            let attributes = t.GetCustomAttributes(typeof(ModuleAttribute), true)
+            where attributes != null && attributes.Length > 0
+            let modules = attributes.Cast<ModuleAttribute>().FirstOrDefault(x => x is not null)
+            select modules;
+
+        if (args.Length == 0)
+        {
+            Console.WriteLine("[-] Usage: {0} {1}ARGS",
+                AppDomain.CurrentDomain.FriendlyName,
+                withModule ? "MODULE " : null);
+
+            if (withModule)
+                PrintModulesName(exitProgram: true);
+        }
+
+        if (!withModule)
+        {
+            return new ArgParser(args);
+        }
+
+        string moduleName = args[0].ToLower();
+        if (!ModulesList.Any(m => m.ModuleName.ToLower() == moduleName))
+        {
+            Console.WriteLine("[-] No such module '{0}'", moduleName);
+            if (withModule)
+                PrintModulesName(exitProgram: true);
+        }
+#if DEBUG
+        Console.WriteLine("[!] Found Module: {0}", moduleName);
+#endif
+        return new ArgParser(args.Skip(1), moduleName);
+    }
+
+    /// <summary>
+    /// Format and prints all available modules
+    /// </summary>
+    /// <param name="exitProgram">Whether to terminate the program or not after printing the modules</param>
+    private static void PrintModulesName(bool exitProgram = false)
+    {
+        Console.WriteLine("Modules:");
+
+        foreach (var module in ModulesList)
+            Console.WriteLine($"- {module.ModuleName,-10} {module.Description}");
+
+
+        if (exitProgram)
+            Environment.Exit(0);
     }
 
     /// <summary>
@@ -34,18 +91,22 @@ public class ArgParser
     {
 
         // Get all properties (args) for current Module
-        var props = typeof(TModuleArgs).GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.GetProperty).Where(m => m.IsDefined(typeof(ArgsAttribute)));
+        var props = typeof(TModuleArgs)
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.GetProperty)
+            .Where(m => m.IsDefined(typeof(ArgsAttribute)));
 
 
         // Error For dev (The given class have no props decorated with ArgsAttribute)
         if (props.Count() == 0)
         {
-            throw new Exception(String.Format("[-] Class '{0}' does not have any members implements '{1}'", typeof(TModuleArgs).FullName, nameof(ArgsAttribute)));
+            throw new Exception(String.Format("[-] Class '{0}' does not have any members implements '{1}'",
+                typeof(TModuleArgs).FullName, nameof(ArgsAttribute)));
         }
 
         ParsedArgsDict = MyParser(RawArgs);
 
         TModuleArgs parsedArgs = new();
+
 
         /// Check if the user supplied args, exist and declared as an ArgsAttribute
         /// Convert the argument to its corresponding (ArgsAttribute) prop type, and set value
@@ -72,7 +133,14 @@ public class ArgParser
                             throw new FormatException();
                         try
                         {
-                            prop.SetValue(parsedArgs, Enum.Parse(safeType, content, true));
+                            string[] enumKeys = Enum.GetNames(safeType);
+
+                            /// Using Contains on the Enum keys to avoid getting int/uint from the user to be parsed into a valid (or invalid) key
+                            //if (enumKeys.Contains(content.ToLower()))
+                            if (enumKeys.Any(x => x.ToLower() == content.ToLower()))
+                                prop.SetValue(parsedArgs, Enum.Parse(safeType, content, true));
+                            else
+                                throw new FormatException();
                         }
                         catch
                         {
@@ -90,12 +158,12 @@ public class ArgParser
                 }
                 catch (Exception ex) when (ex is FormatException || ex is InvalidCastException) // We couldn't convert the argument to the desired type
                 {
-                    string message = String.Format("[-] Invalid value '{0}' for argument '{1}'. (Expected type: {2}{3})",
+                    Console.WriteLine("[-] Invalid value '{0}' for argument '{1}'. (Expected type: {2}{3})",
                         content,
                         argAttribute.LongName,
                         prop.PropertyType.Name,
                         safeType.IsEnum ? " [" + string.Join(", ", Enum.GetNames(safeType)) + "]" : null);
-                    Console.WriteLine(message);
+
                     Environment.Exit(0);
                 }
                 argAttribute.IsSet = true;
@@ -105,6 +173,7 @@ public class ArgParser
                 if (argAttribute.Required)
                 {
                     Console.WriteLine($"[-] Required argument not given ({argAttribute.LongName})");
+                    PrintArgsHelp<TModuleArgs>();
                     Environment.Exit(0);
                 }
             }
@@ -137,6 +206,29 @@ public class ArgParser
     }
 
 
+    /// <summary>
+    /// Print arguments per module (or arguments of Non-modules project)
+    /// </summary>
+    /// <typeparam name="TModuleArgs">The aguments class</typeparam>
+    public void PrintArgsHelp<TModuleArgs>()
+    {
+        Console.WriteLine("Arguments:");
+
+        var moduleArgs = typeof(TModuleArgs).GetProperties().Where(x => x.IsDefined(typeof(ArgsAttribute)));
+        foreach (var prop in moduleArgs)
+        {
+            Type safeType = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
+            var arg = prop.GetCustomAttribute<ArgsAttribute>();
+
+            string helpFormat = String.Format("--{0}{1} ({2}) {3}",
+                arg.LongName,
+                arg.ShortName != null ? $", -{arg.ShortName}" : null,
+                safeType.Name + (arg.Required ? ", Required" : null),
+                arg.Description != null ? $"\t'{arg.Description}'" : null);
+
+            Console.WriteLine(helpFormat);
+        }
+    }
 
     /// <summary>
     /// Parsing string[] args using regex to allow using various methods to pass arguments from cli (/arg:VALUE, /arg=VALUE, --arg VALUE, -arg VALUE)

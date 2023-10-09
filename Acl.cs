@@ -179,9 +179,8 @@ internal class Acl
 
 
 
-    /// TODO: Dynamic ACL works good, make it coresponds to /changeacl:dynamic
-    /// Change grfAccessMode to ACCESS_MODE.REVOKE_ACCESS to revert changes (restore acls)
-    /// Change TrusteeType (i.e. TRUSTEE_TYPE.TRUSTEE_IS_DOMAIN) dynamically
+    /// TODO: Change grfAccessMode to ACCESS_MODE.REVOKE_ACCESS to revert changes (restore acls)
+    /// Change TrusteeType (i.e. TRUSTEE_TYPE.TRUSTEE_IS_DOMAIN) dynamically (TRUSTEE_IS_UNKNOWN works for everything ?!)
     private static bool ChangeACL(IntPtr hObject, ObjectTypeName objName, EXPLICIT_ACCESS[] arrEA)
     {
         SECURITY_INFORMATION secInfo = SECURITY_INFORMATION.OWNER_SECURITY_INFORMATION | SECURITY_INFORMATION.GROUP_SECURITY_INFORMATION | SECURITY_INFORMATION.SACL_SECURITY_INFORMATION | SECURITY_INFORMATION.DACL_SECURITY_INFORMATION;

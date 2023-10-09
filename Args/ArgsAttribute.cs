@@ -1,4 +1,6 @@
-﻿namespace Args;
+﻿using System;
+
+namespace Args;
 
 [AttributeUsage(AttributeTargets.Field | AttributeTargets.Property, AllowMultiple = false)]
 public class ArgsAttribute : Attribute
@@ -18,7 +20,7 @@ public class ArgsAttribute : Attribute
     /// <summary>
     /// Short description to describe the argument purpose
     /// </summary>
-    public string Description { get; set; } = String.Empty;
+    public string Description { get; set; } = null;
     /// <summary>
     /// Don't touch this property
     /// </summary>

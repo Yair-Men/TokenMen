@@ -35,6 +35,7 @@ internal class Launcher
 
     private bool CurrentConsole()
     {
+        bool OK;
 #if DEBUG
         bool OK = GetTokenInformation(Token, TOKEN_INFORMATION_CLASS.TokenSessionId, out IntPtr remoteSessId, sizeof(uint), out _);
         if (OK)
