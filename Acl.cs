@@ -13,7 +13,7 @@ internal enum ObjectTypePermission : uint
 {
     // WorkStation: EnumDesktops|ReadAttributes|AccessClipboard|CreateDesktop|WriteAttributes|AccessGlobalAtoms|ExitWindows|Enumerate|ReadScreen|Delete|ReadControl|WriteDac|WriteOwner
     WorkStation = 983_935,
-    Desktop = 983_551
+    Desktop = 983_551,
 };
 internal enum DefaultSID
 {
@@ -31,6 +31,7 @@ internal enum AclActions
 
 internal class Acl
 {
+    // TODO: Remove line below
     //private static readonly SECURITY_INFORMATION secInfo = SECURITY_INFORMATION.OWNER_SECURITY_INFORMATION | SECURITY_INFORMATION.GROUP_SECURITY_INFORMATION |
     //        SECURITY_INFORMATION.SACL_SECURITY_INFORMATION | SECURITY_INFORMATION.DACL_SECURITY_INFORMATION;
 

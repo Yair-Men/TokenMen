@@ -1,5 +1,4 @@
-﻿
-using Args;
+﻿using Args;
 using System.Diagnostics;
 using TokenMen.ModulesOptions;
 
@@ -67,7 +66,7 @@ internal class ExecModule
 
         object objTrustee = args.ChangeACL switch
         {
-            AclActions.Everyone => default,
+            AclActions.Everyone => null,
             AclActions.Dynamic => hDupToken,
             AclActions.Sid => args.Trustee,
             AclActions.User => args.Trustee,

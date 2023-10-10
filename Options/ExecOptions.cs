@@ -3,7 +3,7 @@
 
 namespace TokenMen.ModulesOptions;
 
-[Module("exec", Description = "Steal process's token and spawn/inject a process")]
+[Module("Exec", Description = "Steal process's token and spawn/inject a process")]
 internal class ExecOptions
 {
     [Args("command", ShortName = "c", Required = true)]

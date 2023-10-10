@@ -37,12 +37,11 @@ internal class Launcher
     {
         bool OK;
 #if DEBUG
-        bool OK = GetTokenInformation(Token, TOKEN_INFORMATION_CLASS.TokenSessionId, out IntPtr remoteSessId, sizeof(uint), out _);
+        OK = GetTokenInformation(Token, TOKEN_INFORMATION_CLASS.TokenSessionId, out IntPtr remoteSessId, sizeof(uint), out _);
         if (OK)
             Console.WriteLine("[+] Duplicated token session id: {0}", remoteSessId.ToInt32());
 #endif
-        //// Just a high value that would never exists as a Session ID
-        //if (sessId != UInt32.MaxValue)
+        /// Just a high value that would never exists as a Session ID
         if (SessId is not null)
         {
             /// In interactive mode we need the duplicated process's token session ID to be the same as our process (use tasklist/taskmgr to get your Session ID)

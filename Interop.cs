@@ -364,10 +364,12 @@ internal class WinEnums
         TokenImpersonation
     }
 
+    #region GENERIC_RIGHTS
     internal static readonly uint WRITE_DAC = 0x00040000;
     internal static readonly uint READ_CONTROL = 0x00020000;
     internal static readonly uint DESKTOP_READOBJECTS = 0x0001;
     internal static readonly uint DESKTOP_WRITEOBJECTS = 0x0080;
+    #endregion GENERIC_RIGHTS
 }
 
 internal class WinStrcuts
