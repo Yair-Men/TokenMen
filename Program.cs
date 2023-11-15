@@ -15,15 +15,15 @@ public class Program
             case "exec":
                 ExecModule.Run(parser);
                 break;
-            case "list":
-                ListModule.Run(parser);
+            case "misc":
+                MiscModule.Run(parser);
                 break;
             case "edit":
                 EditModule.Run(parser);
                 break;
             default:
-                Console.WriteLine("default");
                 break;
         }
+
     }
 }

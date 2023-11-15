@@ -71,10 +71,10 @@
     <Compile Include="Interop.cs" />
     <Compile Include="Launcher.cs" />
     <Compile Include="Modules\EditModule.cs" />
-    <Compile Include="Modules\ListModule.cs" />
+    <Compile Include="Modules\MiscModule.cs" />
     <Compile Include="Options\EditOptions.cs" />
     <Compile Include="Options\ExecOptions.cs" />
-    <Compile Include="Options\ListOptions.cs" />
+    <Compile Include="Options\MiscOptions.cs" />
     <Compile Include="Modules\ExecModule.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

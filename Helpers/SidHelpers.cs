@@ -44,7 +44,6 @@ internal static class SidHelpers
         }
     }
 
-
     
     /// <summary>
     /// Create Sids For WellKnown Groups/Users
@@ -56,7 +55,7 @@ internal static class SidHelpers
         //IntPtr pSid = IntPtr.Zero;
         uint realsize = 10;
 
-        // Everyone SID
+        // Everyone's SID
         CreateWellKnownSid(sidType, IntPtr.Zero, IntPtr.Zero, ref realsize);
         IntPtr pSid = Marshal.AllocCoTaskMem(Convert.ToInt32(realsize));
 

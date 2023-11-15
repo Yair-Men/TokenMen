@@ -13,9 +13,7 @@ internal static class TrusteeAndEA
     /// <returns>TRUSTEE</returns>
     internal static TRUSTEE CreateTrustee(TRUSTEE_FORM trusteeForm, IntPtr ptstrName)
     {
-     
-
-        TRUSTEE trustee = new()
+        return new TRUSTEE()
         {
             pMultipleTrustee = IntPtr.Zero,
             MultipleTrusteeOperation = MULTIPLE_TRUSTEE_OPERATION.NO_MULTIPLE_TRUSTEE,
@@ -23,8 +21,6 @@ internal static class TrusteeAndEA
             TrusteeForm = trusteeForm,
             ptstrName = ptstrName
         };
-
-        return trustee;
     }
 
 
@@ -37,15 +33,13 @@ internal static class TrusteeAndEA
     /// <returns>new EXPLICIT_ACCESS instance</returns>
     internal static EXPLICIT_ACCESS CreateEa(TRUSTEE trustee, ObjectTypePermission permissions, ACCESS_MODE accessMode)
     {
-        EXPLICIT_ACCESS EA = new()
+        return new EXPLICIT_ACCESS()
         {
             grfAccessPermissions = (uint)permissions,
             grfAccessMode = accessMode,
             grfInheritance = 0,
             Trustee = trustee
         };
-
-        return EA;
     }
 
 }

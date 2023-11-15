@@ -80,8 +80,6 @@ internal class ExecModule
         }
         Console.WriteLine("[+] ACLs changed");
 
-    // TODO: revoke ACL
-
     Launcher:
         Launcher launcher = new(hDupToken, args.Command, args.Interactive,
             parser.IsSet(nameof(args.SessionId)) ? args.SessionId : null);

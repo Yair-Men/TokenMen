@@ -27,10 +27,7 @@ internal class Launcher
 
     internal bool Launch()
     {
-        if (Interactive)
-            return CurrentConsole();
-        else
-            return NewConsole();
+        return Interactive ? CurrentConsole() : NewConsole();
     }
 
     private bool CurrentConsole()
@@ -41,7 +38,7 @@ internal class Launcher
         if (OK)
             Console.WriteLine("[+] Duplicated token session id: {0}", remoteSessId.ToInt32());
 #endif
-        /// Just a high value that would never exists as a Session ID
+        
         if (SessId is not null)
         {
             /// In interactive mode we need the duplicated process's token session ID to be the same as our process (use tasklist/taskmgr to get your Session ID)

@@ -124,9 +124,12 @@ public class ArgParser
             {
                 // Check if its a Nullable type. If it does, we need the underlying type or else we crash
                 Type safeType = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
-
+                
                 try
                 {
+                    if (String.IsNullOrEmpty(content) && argAttribute.Required && !safeType.Equals(typeof(Boolean)))
+                        throw new FormatException();
+
                     if (safeType.IsEnum)
                     {
                         if (String.IsNullOrEmpty(content))

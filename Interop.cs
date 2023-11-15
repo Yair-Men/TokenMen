@@ -48,24 +48,6 @@ internal class WinAPI
         IntPtr lpThreadAttributes, bool bInheritHandles, uint dwCreationFlags, IntPtr lpEnvironment,
         string lpCurrentDirectory, [In, Optional] ref STARTUPINFO lpStartupInfo, out PROCESS_INFORMATION lpProcessInformation);
 
-    [DllImport("advapi32.dll", SetLastError = true)]
-    internal static extern bool ImpersonateLoggedOnUser(IntPtr hToken);
-
-    [DllImport("Wtsapi32.dll", SetLastError = true)]
-    internal static extern IntPtr WTSOpenServerA([In] string pServerName);
-
-    [DllImport("Wtsapi32.dll", SetLastError = true)]
-    internal static extern void WTSCloseServer([In] IntPtr hServer);
-
-    [DllImport("netapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    internal static extern NET_API_STATUS NetUserSetInfo(string servername, string username, int level, ref USER_INFO_1003 buf, out int parm_err);
-
-    [DllImport("netapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    internal static extern NET_API_STATUS NetUserAdd(string servername, int level, ref USER_INFO_1 buf, out int parm_err);
-
-    [DllImport("netapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    internal static extern NET_API_STATUS NetGroupAddUser(string serverName, string groupName, string userName);
-
     [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     internal static extern uint GetSystemDirectoryW([Out] StringBuilder lpBuffer, uint uSize);
 
@@ -83,9 +65,6 @@ internal class WinAPI
 
     [DllImport("Kernel32.dll", SetLastError = true)]
     internal static extern bool ProcessIdToSessionId(uint dwProcessId, out uint pSessionId);
-
-    [DllImport("Userenv.dll", SetLastError = true)]
-    internal static extern bool CreateEnvironmentBlock( [Out] IntPtr lpEnvironment, [In, Optional] IntPtr hToken, [In] bool bInherit);
 
     [DllImport("advapi32.dll", SetLastError = true)]
     internal static extern uint GetSecurityInfo(IntPtr handle, SE_OBJECT_TYPE ObjectType, SECURITY_INFORMATION SecurityInfo,
@@ -108,17 +87,8 @@ internal class WinAPI
         [Out, Optional] out uint pcCountOfAccessEntries, [Out, Optional] out IntPtr ppListOfAccessEntries,
         [Out, Optional] out uint pcCountOfAuditEntries, [Out, Optional] out IntPtr ppListOfAuditEntries, [In] IntPtr pSD);
 
-    [DllImport("advapi32.dll", CharSet = CharSet.Ansi ,SetLastError = true)]
-    internal static extern string GetTrusteeNameA(IntPtr PTRUSTEE_A);
-
     [DllImport("advapi32.dll", SetLastError = true)]
     internal static extern bool CreateWellKnownSid(WELL_KNOWN_SID_TYPE WellKnownSidType, IntPtr DomainSid, IntPtr pSid, ref uint cbSid);
-
-    [DllImport("advapi32.dll", SetLastError = true)]
-    internal static extern int SetEntriesInAcl(int cCountOfExplicitEntries, ref EXPLICIT_ACCESS pListOfExplicitEntries, IntPtr OldAcl, out IntPtr NewAcl);
-
-    [DllImport("advapi32.dll", SetLastError = true)]
-    internal static extern int SetEntriesInAcl(int cCountOfExplicitEntries, ref EXPLICIT_ACCESS[] pListOfExplicitEntries, IntPtr OldAcl, out IntPtr NewAcl);
 
     [DllImport("advapi32.dll", SetLastError = true)]
     internal static extern int SetEntriesInAcl(int cCountOfExplicitEntries, EXPLICIT_ACCESS[] pListOfExplicitEntries, IntPtr OldAcl, out IntPtr NewAcl);
@@ -131,10 +101,25 @@ internal class WinAPI
 
     [DllImport("advapi32.dll", SetLastError = true)]
     internal static extern bool ConvertStringSidToSid(string StringSid, [Out] out IntPtr ptrSid);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    internal static extern bool RevertToSelf();
 }
 
 internal class WinEnums
 {
+    internal enum NTSTATUS : uint
+    {
+        STATUS_SUCCESS = 0x00000000,
+        STATUS_INVALID_HANDLE = 0xC0000008,
+        STATUS_INFO_LENGTH_MISMATCH = 0xC0000004,
+    }
+    
+    internal enum SYSTEM_INFORMATION_CLASS : uint
+    {
+        SystemHandleInformation = 0x10,
+    }
+
     internal enum SID_NAME_USE
     {
         SidTypeUser = 1,
@@ -265,7 +250,6 @@ internal class WinEnums
         RPC_E_REMOTE_DISABLED = 2147549468 // 0x8001011C
     }
 
-
     public const int SE_PRIVILEGE_ENABLED = 0x00000002;
     public const int SE_PRIVILEGE_REMOVED = 0x00000004;
 
@@ -367,63 +351,10 @@ internal class WinEnums
     #region GENERIC_RIGHTS
     internal static readonly uint WRITE_DAC = 0x00040000;
     internal static readonly uint READ_CONTROL = 0x00020000;
+    #endregion GENERIC_RIGHTS
+    
     internal static readonly uint DESKTOP_READOBJECTS = 0x0001;
     internal static readonly uint DESKTOP_WRITEOBJECTS = 0x0080;
-    #endregion GENERIC_RIGHTS
-}
-
-internal class WinStrcuts
-{
-    [StructLayout(LayoutKind.Sequential)]
-    public struct SID_AND_ATTRIBUTES
-    {
-        public IntPtr pSID;
-        public uint Attributes;
-    }
-
-    public struct TOKEN_USER
-    {
-        public SID_AND_ATTRIBUTES User;
-    }
-
-    public struct SID_IDENTIFIER_AUTHORITY
-    {
-        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 6)]
-        public byte[] Value;
-
-        public SID_IDENTIFIER_AUTHORITY(byte[] value)
-        {
-            Value = value;
-        }
-    }
-
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-    public struct USER_INFO_1
-    {
-        public string usri1_name;
-        public string usri1_password;
-        public int usri1_password_age;
-        public int usri1_priv;
-        public string usri1_home_dir;
-        public string usri1_comment;
-        public int usri1_flags;
-        public string usri1_script_path;
-    }
-
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-    public struct USER_INFO_1003
-    {
-        public string sPassword;
-    }
-
-    public struct ACL
-    {
-        public byte AclRevision;
-        public byte Sbz1;
-        public byte AclSize;
-        public byte AceCount;
-        public byte Sbz2;
-    }
 
     public enum TRUSTEE_FORM : uint
     {
@@ -453,6 +384,77 @@ internal class WinStrcuts
         TRUSTEE_IS_IMPERSONATE
     };
 
+    public enum ACCESS_MODE : uint
+    {
+        NOT_USED_ACCESS,
+        GRANT_ACCESS,
+        SET_ACCESS,
+        DENY_ACCESS,
+        REVOKE_ACCESS,
+        SET_AUDIT_SUCCESS,
+        SET_AUDIT_FAILURE
+    };
+}
+
+internal class WinStrcuts
+{
+    [StructLayout(LayoutKind.Sequential)]
+    public struct UNICODE_STRING
+    {
+        public ushort Length;
+        public ushort MaximumLength;
+        public IntPtr pBuffer;
+
+        public UNICODE_STRING(string s)
+        {
+            Length = (ushort)(s.Length * 2);
+            MaximumLength = (ushort)(Length + 2);
+            pBuffer = Marshal.StringToHGlobalUni(s);
+        }
+
+        /// <summary>
+        /// Use this method only when using the ctor to create an instance with actual data in the Buffer
+        /// </summary>
+        public void Dispose()
+        {
+            Marshal.FreeHGlobal(pBuffer);
+            pBuffer = IntPtr.Zero;
+        }
+
+        /// <summary>
+        /// Prop to mimic Windows STRUCT (Can also use the override ToString below)
+        /// </summary>
+        public readonly string Buffer => Marshal.PtrToStringUni(pBuffer);
+        public override readonly string ToString() => Buffer;
+
+    }
+
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct SID_AND_ATTRIBUTES
+    {
+        public IntPtr pSID;
+        public uint Attributes;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct TOKEN_USER
+    {
+        [MarshalAs(UnmanagedType.Struct)]
+        public SID_AND_ATTRIBUTES User;
+    }
+
+    public struct SID_IDENTIFIER_AUTHORITY
+    {
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 6)]
+        public byte[] Value;
+
+        public SID_IDENTIFIER_AUTHORITY(byte[] value)
+        {
+            Value = value;
+        }
+    }
+
     [StructLayout(LayoutKind.Sequential, Pack = 0)]
     public struct TRUSTEE
     {
@@ -473,17 +475,6 @@ internal class WinStrcuts
         private IntPtr ptstrName;
         public string strName => Marshal.PtrToStringAnsi(ptstrName);
     }
-
-    public enum ACCESS_MODE : uint
-    {
-        NOT_USED_ACCESS,
-        GRANT_ACCESS,
-        SET_ACCESS,
-        DENY_ACCESS,
-        REVOKE_ACCESS,
-        SET_AUDIT_SUCCESS,
-        SET_AUDIT_FAILURE
-    };
 
     [StructLayout (LayoutKind.Sequential, Pack = 0)]
     public struct EXPLICIT_ACCESS
@@ -534,15 +525,6 @@ internal class WinStrcuts
         }
     }
 
-    
-    [StructLayout(LayoutKind.Sequential)]
-    public struct SECURITY_ATTRIBUTES
-    {
-        public int nLength;
-        public IntPtr lpSecurityDescriptor;
-        public int bInheritHandle;
-    }
-
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     public struct STARTUPINFO
     {
@@ -565,6 +547,7 @@ internal class WinStrcuts
         public IntPtr hStdOutput;
         public IntPtr hStdError;
     }
+    
     public struct PROCESS_INFORMATION
     {
         public IntPtr hProcess;

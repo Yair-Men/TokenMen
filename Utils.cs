@@ -2,6 +2,7 @@
 
 internal static class Utils
 {
+    internal static bool Is64Bit() => IntPtr.Size == 8;
     internal static bool PrivilegeEnabler(string[] privs)
     {
         bool success = false;

@@ -11,7 +11,6 @@ internal enum ObjectTypeName
 
 internal enum ObjectTypePermission : uint
 {
-    // WorkStation: EnumDesktops|ReadAttributes|AccessClipboard|CreateDesktop|WriteAttributes|AccessGlobalAtoms|ExitWindows|Enumerate|ReadScreen|Delete|ReadControl|WriteDac|WriteOwner
     WorkStation = 983_935,
     Desktop = 983_551,
 };
@@ -31,9 +30,6 @@ internal enum AclActions
 
 internal class Acl
 {
-    // TODO: Remove line below
-    //private static readonly SECURITY_INFORMATION secInfo = SECURITY_INFORMATION.OWNER_SECURITY_INFORMATION | SECURITY_INFORMATION.GROUP_SECURITY_INFORMATION |
-    //        SECURITY_INFORMATION.SACL_SECURITY_INFORMATION | SECURITY_INFORMATION.DACL_SECURITY_INFORMATION;
 
     /// <summary>
     /// Change WorkStation and Desktop ACL. aclAction -> objTrustee relation:
@@ -49,11 +45,8 @@ internal class Acl
         if (!Utils.PrivilegeEnabler(new string[] { SE_SECURITY_NAME }))
             return false;
 
-        // TODO: In all modes but AclActions.all we need only 1 TRUSTEE and 1 EA
-        // Doesn't break functionality but try to figure out how to change arr size dynamically
         var arrTrustee = new TRUSTEE[1];
         var arrEa = new EXPLICIT_ACCESS[1];
-        
 
         IntPtr pTrusteeName = IntPtr.Zero;
         var trusteeForm = TRUSTEE_FORM.TRUSTEE_IS_SID;
@@ -179,9 +172,9 @@ internal class Acl
     }
 
 
+    // TODO: Change TrusteeType dynamically (i.e. TRUSTEE_TYPE.TRUSTEE_IS_DOMAIN)
+    // TRUSTEE_IS_UNKNOWN works for everything ?!
 
-    /// TODO: Change grfAccessMode to ACCESS_MODE.REVOKE_ACCESS to revert changes (restore acls)
-    /// Change TrusteeType (i.e. TRUSTEE_TYPE.TRUSTEE_IS_DOMAIN) dynamically (TRUSTEE_IS_UNKNOWN works for everything ?!)
     private static bool ChangeACL(IntPtr hObject, ObjectTypeName objName, EXPLICIT_ACCESS[] arrEA)
     {
         SECURITY_INFORMATION secInfo = SECURITY_INFORMATION.OWNER_SECURITY_INFORMATION | SECURITY_INFORMATION.GROUP_SECURITY_INFORMATION | SECURITY_INFORMATION.SACL_SECURITY_INFORMATION | SECURITY_INFORMATION.DACL_SECURITY_INFORMATION;
